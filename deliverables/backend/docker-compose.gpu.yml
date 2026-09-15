@@ -1,0 +1,11 @@
+# 可选 GPU 覆盖文件 —— 由启动器在检测到 NVIDIA GPU 时自动合并，请勿手动编辑。
+# 仅声明把宿主机 GPU 透传给 ollama 容器；其余配置继承 docker-compose.yml。
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

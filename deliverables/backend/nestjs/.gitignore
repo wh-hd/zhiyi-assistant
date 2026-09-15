@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+public/uploads/
+test-results/
+playwright-report/
+
+# 本地 JSON 咨询记录（按用户隔离保存完整对话）
+tmp/consultations/
+!tmp/.gitkeep

@@ -1,0 +1,59 @@
+# ============================================================
+# 智医助手 - Git 忽略规则
+# ⚠️ 严禁提交任何真实密钥/连接串；.env 只保留 .env.example 模板
+# ============================================================
+
+# ---- 环境变量与密钥（关键）----
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# ---- 依赖 ----
+node_modules/
+**/node_modules/
+
+# ---- 构建产物 ----
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+
+# ---- 日志 ----
+*.log
+logs/
+**/logs/
+_api_log.txt
+server_test.log
+
+# ---- 运行时数据 / 用户隐私数据 ----
+**/tmp/consultations/
+**/tmp/*.json
+**/public/uploads/
+**/uploads/
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+
+# ---- WorkBuddy 本地上下文（不提交）----
+.workbuddy/
+
+# ---- Python ----
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- 操作系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>智医助手 - AI 家庭健康管理</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:3000 https:; object-src 'none'; base-uri 'none'; form-action 'self'">
+<link rel="stylesheet" href="./zhiyi-assistant-prototype.css">
+<!-- 数据全部来自后端 NestJS API（localhost:3000/v1），不再依赖任何本地静态数据文件 -->
+</head>
+<body>
+
+<div class="phone-frame" id="phoneFrame">
+
+  <!-- Loading Screen -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">正在加载数据...</div>
+  </div>
+
+  <!-- ============ SCREEN 1: Home Dashboard ============ -->
+  <div class="screen" id="screen-home" data-tab="home">
+    <div class="status-bar" id="sb-home"></div>
+    <div class="content" id="content-home"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 2: Health Self-Assessment ============ -->
+  <div class="screen" id="screen-assess" data-tab="assess">
+    <div class="status-bar" id="sb-assess"></div>
+    <div class="content" id="content-assess"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 3: AI Consultation ============ -->
+  <div class="screen" id="screen-consult" data-tab="consult">
+    <div class="status-bar" id="sb-consult"></div>
+    <div class="content" id="content-consult"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="consult"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 4: Family Archive ============ -->
+  <div class="screen" id="screen-archive" data-tab="archive">
+    <div class="status-bar" id="sb-archive"></div>
+    <div class="content" id="content-archive"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="archive"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 5: Medication Reminders ============ -->
+  <div class="screen" id="screen-meds" data-tab="meds">
+    <div class="status-bar" id="sb-meds"></div>
+    <div class="content" id="content-meds"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 6: Health Metrics ============ -->
+  <div class="screen" id="screen-metrics" data-tab="metrics">
+    <div class="status-bar" id="sb-metrics"></div>
+    <div class="content" id="content-metrics"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 7: Profile ============ -->
+  <div class="screen" id="screen-profile" data-tab="profile">
+    <div class="status-bar" id="sb-profile"></div>
+    <div class="content" id="content-profile"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="profile"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 8: Assess Report ============ -->
+  <div class="screen" id="screen-assess-report" data-tab="assess-report">
+    <div class="status-bar" id="sb-assess-report"></div>
+    <div class="content" id="content-assess-report"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 9: Member Detail ============ -->
+  <div class="screen" id="screen-member-detail" data-tab="member-detail">
+    <div class="status-bar" id="sb-member-detail"></div>
+    <div class="content" id="content-member-detail"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="archive"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 10: Add Member ============ -->
+  <div class="screen" id="screen-add-member" data-tab="add-member">
+    <div class="status-bar" id="sb-add-member"></div>
+    <div class="content" id="content-add-member"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="archive"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 11: Add Medication ============ -->
+  <div class="screen" id="screen-add-med" data-tab="add-med">
+    <div class="status-bar" id="sb-add-med"></div>
+    <div class="content" id="content-add-med"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 12: Record Metric ============ -->
+  <div class="screen" id="screen-record-metric" data-tab="record-metric">
+    <div class="status-bar" id="sb-record-metric"></div>
+    <div class="content" id="content-record-metric"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="home"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 13: Settings ============ -->
+  <div class="screen" id="screen-settings" data-tab="settings">
+    <div class="status-bar" id="sb-settings"></div>
+    <div class="content" id="content-settings"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="profile"></div></div>
+  </div>
+
+  <!-- ============ SCREEN 14: About ============ -->
+  <div class="screen" id="screen-about" data-tab="about">
+    <div class="status-bar" id="sb-about"></div>
+    <div class="content" id="content-about"></div>
+    <div class="tab-bar-container"><div class="tab-pill" data-tabbar="profile"></div></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+</div><!-- /phone-frame -->
+
+
+<script src="./runtime-config.js"></script>
+<script src="./zhiyi-assistant-prototype.js"></script>
+</body>
+</html>

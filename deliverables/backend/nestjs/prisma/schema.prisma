@@ -1,0 +1,486 @@
+// ============================================================
+// 智医助手 - Prisma Schema (MySQL / TiDB Cloud 版)
+// 版本: 0.3.0
+// 数据库: TiDB Cloud / MySQL 兼容（连接串见 .env 的 DATABASE_URL）
+// 注意: MySQL 默认 String = VARCHAR(191)，长文本字段需 @db.Text
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 1. 用户与认证
+// ============================================================
+
+model User {
+  id             String   @id @default(uuid())
+  wxOpenid       String?  @unique
+  wxUnionid      String?
+  email          String?  @unique
+  passwordHash   String?
+  nickname       String?
+  avatarUrl      String?
+  phone          String?
+  gender         Int?            // 0:未知 1:男 2:女
+  birthday       DateTime?
+  ageGroup       String?
+  isElderlyMode  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  refreshTokens     RefreshToken[]
+  familyMemberships FamilyMember[]
+  createdFamilies   Family[]        @relation("FamilyCreator")
+  medicationPlans   MedicationPlan[]
+  notifications     Notification[]
+  roleAuditsActed    FamilyRoleAudit[] @relation("RoleAuditActor")
+
+  @@index([wxOpenid])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  deviceInfo String?   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+// 2. 家庭与成员
+// ============================================================
+
+model Family {
+  id          String   @id @default(uuid())
+  name        String
+  createdBy   String
+  memberCount Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator        User           @relation("FamilyCreator", fields: [createdBy], references: [id])
+  members        FamilyMember[]
+  assessments    Assessment[]
+  consultations  Consultation[]
+  medicationPlans MedicationPlan[]
+  notifications  Notification[]
+  healthReports  HealthReport[]
+  tasks          Task[]
+  roleAudits     FamilyRoleAudit[]
+
+  @@map("families")
+}
+
+model FamilyMember {
+  id        String   @id @default(uuid())
+  familyId  String
+  userId    String?          // 关联注册用户(未注册成员可为空)
+  role      String   @default("member")  // admin/caregiver/member
+  nickname  String
+  relation  String?          // self/spouse/child/parent/grandparent/other
+  avatarUrl String?
+  age       Int?
+  gender    Int?
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family          Family            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user            User?             @relation(fields: [userId], references: [id])
+  healthRecord    HealthRecord?
+  assessments     Assessment[]
+  consultations   Consultation[]
+  medicationPlans MedicationPlan[]
+  healthMetrics   HealthMetric[]
+  healthReports   HealthReport[]
+  tasks           Task[]
+  roleAuditTargets FamilyRoleAudit[] @relation("RoleAuditTarget")
+
+  @@unique([familyId, userId])
+  @@unique([familyId, sortOrder], map: "family_members_family_sort_uq")
+  @@index([userId])
+  @@index([familyId])
+  @@map("family_members")
+}
+
+model FamilyRoleAudit {
+  id             String   @id @default(uuid())
+  familyId       String
+  actorUserId    String
+  targetMemberId String
+  oldRole        String
+  newRole        String
+  action         String
+  requestId      String
+  createdAt      DateTime @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  actor User @relation("RoleAuditActor", fields: [actorUserId], references: [id])
+  target FamilyMember @relation("RoleAuditTarget", fields: [targetMemberId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, createdAt])
+  @@map("family_role_audits")
+}
+
+// ============================================================
+// 3. 健康档案（核心壁垒）
+// ============================================================
+
+model HealthRecord {
+  id             String    @id @default(uuid())
+  memberId       String    @unique
+
+  bloodType      String?
+  heightCm       Float?
+  weightKg       Float?
+
+  // JSON 存储灵活结构（TiDB MySQL 长文本类型）
+  chronicDiseases String  @db.Text
+  allergies       String  @db.Text
+  surgeries       String  @db.Text
+  familyHistory   String  @db.Text
+  vaccinations    String  @db.Text
+
+  lastCheckupDate DateTime?
+  checkupSummary  String? @db.Text
+
+  // 自评快照
+  lastAssessmentId    String?
+  lastAssessmentScore Decimal? @db.Decimal(4, 1)
+  lastAssessmentDate  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("health_records")
+}
+
+// ============================================================
+// 4. 健康自评
+// ============================================================
+
+model Assessment {
+  id       String @id @default(uuid())
+  memberId String
+  familyId String
+
+  type String @default("initial")  // initial/review/manual
+
+  totalScore     Decimal? @db.Decimal(4, 1)
+  categoryScores String? @db.Text
+  topConcerns    String  @db.Text
+  radarChart     String? @db.Text
+  fullAnalysis   String? @db.Text
+
+  rawAnswers String? @db.Text
+
+  questions String? @db.Text // 本次随机抽出的 10 道题目（JSON），用于回显与评分
+
+  ownerUserId  String?
+  currentStep  Int       @default(0)
+  expiresAt    DateTime?
+  requestKey   String?   @unique
+  status        String    @default("completed")
+  completedAt   DateTime?
+  nextReviewAt  DateTime?
+  reviewNotified Boolean  @default(false)   // 复评提醒去重标记（cron 扫描后置位）
+
+  createdAt DateTime @default(now())
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  family Family       @relation(fields: [familyId], references: [id])
+
+  @@index([memberId, createdAt])
+  @@index([familyId, createdAt])
+  @@index([nextReviewAt, reviewNotified])
+  @@map("assessments")
+}
+
+// ============================================================
+// 5. AI 健康咨询
+// ============================================================
+
+model Consultation {
+  id               String    @id @default(uuid())
+  memberId         String
+  familyId         String
+
+  sessionId        String
+
+  queryText        String   @db.Text
+  inputType        String    @default("text")
+
+  responseText     String?  @db.Text
+  responseType     String?
+
+  // 就医红线
+  redLineTriggered Boolean   @default(false)
+  redLineCategory  String?
+  redLineSeverity  String?
+
+  // 安全
+  selfHarmDetected  Boolean  @default(false)
+  disclaimerShown   Boolean  @default(true)
+
+  // 用户反馈
+  satisfaction     Int?
+  feedbackText     String?  @db.Text
+
+  // AI 元数据
+  llmModel         String?
+  promptVersion    String?
+  tokensUsed       Int?
+  responseTimeMs   Int?
+
+  createdAt DateTime @default(now())
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  family Family       @relation(fields: [familyId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([memberId, createdAt])
+  @@index([redLineTriggered])
+  @@index([selfHarmDetected])
+  @@map("consultations")
+}
+
+// ============================================================
+// 6. 用药管理
+// ============================================================
+
+model MedicationPlan {
+  id              String    @id @default(uuid())
+  memberId        String
+  familyId        String
+
+  medicineName    String
+  medicineCode    String?
+  dosage          String?
+  dosageUnit      String?
+
+  frequency       String         // daily/twice_daily/three_times/every_8h/custom
+  customSchedule  String?        @db.Text
+
+  startDate       DateTime
+  endDate         DateTime?
+
+  source          String    @default("manual")  // manual/ocr
+  ocrImageUrl     String?
+
+  createdBy       String
+  reminderUserId  String?
+
+  isActive        Boolean   @default(true)
+  notes           String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member     FamilyMember         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  family     Family               @relation(fields: [familyId], references: [id])
+  creator    User                 @relation(fields: [createdBy], references: [id])
+  adherences MedicationAdherence[]
+
+  @@index([memberId, isActive])
+  @@map("medication_plans")
+}
+
+model MedicationAdherence {
+  id              String    @id @default(uuid())
+  planId          String
+
+  scheduledAt     DateTime
+  takenAt         DateTime?
+  status          String    @default("pending")   // pending/taken/missed/skipped
+  confirmedBy     String?
+
+  missedNotified    Boolean   @default(false)
+  missedNotifiedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  plan MedicationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, scheduledAt], map: "medication_adherence_plan_scheduled_uq")
+  @@index([status, missedNotified])
+  @@map("medication_adherence")
+}
+
+// ============================================================
+// 7. 健康指标（时序数据）
+// ============================================================
+
+model HealthMetric {
+  id           String   @id @default(uuid())
+  memberId     String
+
+  metricType   String
+  value        Float
+  unit         String
+
+  groupId      String?
+
+  inputMethod  String   @default("manual")
+  deviceId     String?
+
+  notes        String?  @db.Text
+
+  // 连续异常计数与预警去重（由 MetricService.afterRecord 维护，cron 扫描后标记）
+  abnormalStreak   Int     @default(0)
+  abnormalAlerted  Boolean @default(false)
+
+  recordedAt   DateTime
+  createdAt    DateTime @default(now())
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, metricType, recordedAt])
+  @@index([groupId])
+  @@index([memberId, metricType, abnormalAlerted])
+  @@map("health_metrics")
+}
+
+model MetricThreshold {
+  id                    String  @id @default(uuid())
+  metricType            String  @unique
+  minNormal             Float?
+  maxNormal             Float?
+  alertConsecutiveCount Int     @default(3)
+  createdAt             DateTime @default(now())
+
+  @@map("metric_thresholds")
+}
+
+// ============================================================
+// 8. 通知与消息
+// ============================================================
+
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String
+  familyId   String?
+
+  type       String    // medication_reminder/missed_dose/metric_alert/assessment_review/system
+  title      String
+  body       String?   @db.Text
+  actionUrl  String?
+
+  channel    String    @default("wechat_subscribe")
+
+  status     String    @default("pending")
+  deliveryStatus String @default("pending")
+  idempotencyKey String? @unique
+  sentAt     DateTime?
+  readAt     DateTime?
+
+  retryCount Int       @default(0)
+  maxRetries Int       @default(3)
+  lastError  String?   @db.Text
+
+  createdAt  DateTime  @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  family Family? @relation(fields: [familyId], references: [id])
+
+  @@index([userId, status, createdAt])
+  @@index([status])
+  @@map("notifications")
+}
+
+// ============================================================
+// 9. 健康知识库
+// ============================================================
+
+model Knowledge {
+  id          String   @id @default(uuid())
+  category    String   // chronic_disease/nutrition/exercise/medication_safety/mental_health/child_care/elderly_care/first_aid
+  title       String
+  summary     String?  @db.Text
+  content     String?  @db.Text
+  tags        String?  @db.Text
+  coverUrl    String?
+  readCount   Int      @default(0)
+  isPublished Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category, isPublished])
+  @@index([sortOrder])
+  @@map("knowledge")
+}
+
+// ============================================================
+// 10. 健康报告（生成式）
+// ============================================================
+
+model HealthReport {
+  id          String    @id @default(uuid())
+  memberId    String
+  familyId    String
+
+  type        String    @default("periodic")  // periodic/annual/condition/consult_summary
+  title       String
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  summary     String?   @db.Text
+  dataJson    String?   @db.Text   // 结构化报告数据 (JSON)
+  pdfUrl      String?
+
+  createdBy   String
+  createdAt   DateTime  @default(now())
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  family Family       @relation(fields: [familyId], references: [id])
+
+  @@index([memberId, createdAt])
+  @@index([familyId, createdAt])
+  @@map("health_reports")
+}
+
+model Task {
+  id         String    @id @default(uuid())
+  familyId   String
+  family     Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  memberId   String?   // 关联家庭成员（可选）
+  member     FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  title      String
+  detail     String?   @db.Text
+  icon       String?   // 预设图标 key 或 svg path
+  iconBg     String?
+  iconStroke String?
+
+  done       Boolean   @default(false)
+  dueDate    DateTime? // 截止日期（可选）
+  sortOrder  Int       @default(0)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([familyId, done])
+  @@index([familyId, sortOrder])
+  @@map("tasks")
+}

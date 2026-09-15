@@ -1,0 +1,87 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?required}", "--appendonly", "yes"]
+    expose: ["6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+    networks: ["internal"]
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?required}
+    expose: ["9000", "9001"]
+    volumes: ["minio_data:/data"]
+    networks: ["internal"]
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    expose: ["11434"]
+    entrypoint: ["/bin/sh", "/ollama-entrypoint.sh"]
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./ollama-entrypoint.sh:/ollama-entrypoint.sh:ro
+    # 默认以 CPU 运行。启动器 (start_server.bat / start-zhiyi.sh) 会自动探测宿主机
+    # NVIDIA GPU，若检测到则自动合并 docker-compose.gpu.yml 把 GPU 透传进容器。
+    # 无需手动修改本文件。
+    networks: ["internal", "edge"]
+  api:
+    build: { context: ./nestjs, dockerfile: Dockerfile }
+    restart: unless-stopped
+    expose: ["3000"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./nestjs/tmp:/app/tmp"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      APP_PORT: "3000"
+      DATABASE_URL: ${DATABASE_URL:?required}
+      DATABASE_CONNECTION_LIMIT: "20"
+      DATABASE_POOL_TIMEOUT: "10"
+      DATABASE_CONNECT_TIMEOUT: "15"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?required}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+      WX_APP_ID: ${WX_APP_ID:-}
+      WX_APP_SECRET: ${WX_APP_SECRET:-}
+      SECURITY_ALERT_CHANNEL: ${SECURITY_ALERT_CHANNEL:-log}
+      SECURITY_ALERT_WEBHOOK_URL: ${SECURITY_ALERT_WEBHOOK_URL:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      UPLOAD_ENABLED: "false"
+      ALLOW_DEV_IDENTITY: "true"
+      LLM_BASE_URL: http://ollama:11434
+      LLM_TIMEOUT: "30000"
+      OSS_ENDPOINT: minio
+      OSS_ACCESS_KEY: ${MINIO_ROOT_USER:?required}
+      OSS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?required}
+    depends_on:
+      redis: { condition: service_healthy }
+    networks: ["edge", "internal"]
+volumes:
+  redis_data:
+  minio_data:
+  ollama_data:
+networks:
+  edge:
+  internal:
+    internal: true

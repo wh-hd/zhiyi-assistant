@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZhiYi Assistant - API Test Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --bg-card: #1a1d27;
+      --bg-hover: #222632;
+      --border: #2a2e3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --green: #3d8a5a;
+      --green-bright: #4ec878;
+      --blue: #3b82f6;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --cyan: #06b6d4;
+      --radius: 8px;
+      --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { font-size: 18px; font-weight: 700; }
+    .logo span { color: var(--green-bright); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .status-badge {
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .status-badge.online { background: rgba(61,138,90,.2); color: var(--green-bright); border: 1px solid rgba(78,200,120,.3); }
+    .status-badge.offline { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status-badge.online .status-dot { background: var(--green-bright); box-shadow: 0 0 6px var(--green-bright); }
+    .status-badge.offline .status-dot { background: var(--red); }
+    .token-display {
+      font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+      max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      padding: 4px 8px; background: var(--bg); border-radius: 4px; border: 1px solid var(--border);
+    }
+    .btn { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+    .btn-primary { background: var(--green); color: #fff; }
+    .btn-primary:hover { background: var(--green-bright); }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-secondary:hover { background: var(--bg-hover); }
+
+    /* ===== Layout ===== */
+    .main { display: flex; flex: 1; overflow: hidden; }
+    .sidebar { width: 200px; background: var(--bg-card); border-right: 1px solid var(--border); padding: 12px 0; overflow-y: auto; flex-shrink: 0; }
+    .sidebar-section { margin-bottom: 4px; }
+    .sidebar-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); padding: 8px 16px 4px; }
+    .sidebar-item {
+      padding: 8px 16px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;
+      transition: background .1s; border-left: 3px solid transparent;
+    }
+    .sidebar-item:hover { background: var(--bg-hover); }
+    .sidebar-item.active { background: var(--bg-hover); border-left-color: var(--green-bright); color: var(--green-bright); }
+    .sidebar-item .count { margin-left: auto; font-size: 10px; color: var(--text-dim); background: var(--bg); padding: 1px 6px; border-radius: 10px; }
+
+    .content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+    /* ===== Endpoint Cards ===== */
+    .module-title { font-size: 20px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .module-title .icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .endpoint-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 12px; overflow: hidden; transition: border-color .15s;
+    }
+    .endpoint-card:hover { border-color: var(--text-dim); }
+    .endpoint-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; }
+    .method-badge {
+      font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+      min-width: 52px; text-align: center;
+    }
+    .method-GET { background: rgba(61,138,90,.2); color: var(--green-bright); }
+    .method-POST { background: rgba(59,130,246,.2); color: var(--blue); }
+    .method-PATCH { background: rgba(245,158,11,.2); color: var(--orange); }
+    .method-DELETE { background: rgba(239,68,68,.2); color: var(--red); }
+    .endpoint-path { font-family: var(--mono); font-size: 13px; flex: 1; }
+    .endpoint-desc { font-size: 12px; color: var(--text-dim); }
+    .endpoint-body { padding: 0 16px 12px; display: none; }
+    .endpoint-card.expanded .endpoint-body { display: block; }
+    .endpoint-card.expanded .endpoint-header { border-bottom: 1px solid var(--border); }
+    .field-row { margin-bottom: 8px; }
+    .field-label { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
+    .field-input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+      padding: 8px 10px; color: var(--text); font-family: var(--mono); font-size: 12px;
+      outline: none; transition: border-color .15s;
+    }
+    .field-input:focus { border-color: var(--green-bright); }
+    textarea.field-input { min-height: 60px; resize: vertical; }
+    .endpoint-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .response-box {
+      margin-top: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+      padding: 10px; font-family: var(--mono); font-size: 12px; overflow-x: auto; max-height: 300px; overflow-y: auto;
+    }
+    .response-meta { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; display: flex; gap: 12px; }
+    .response-meta .ok { color: var(--green-bright); }
+    .response-meta .err { color: var(--red); }
+    .json-key { color: var(--cyan); }
+    .json-string { color: var(--green-bright); }
+    .json-number { color: var(--orange); }
+    .json-bool { color: var(--purple); }
+    .json-null { color: var(--text-dim); }
+
+    /* ===== SSE Chat ===== */
+    .sse-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+    .sse-output {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px;
+      min-height: 120px; max-height: 300px; overflow-y: auto; font-size: 13px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .sse-event { font-size: 11px; color: var(--text-dim); margin-top: 8px; padding-top: 4px; border-top: 1px dashed var(--border); }
+    .sse-event-item { padding: 2px 0; }
+    .sse-event-item .event-name { color: var(--purple); font-weight: 600; }
+
+    /* ===== Copy button ===== */
+    .copy-btn {
+      font-size: 10px; padding: 2px 6px; background: var(--border); border: none; border-radius: 3px;
+      color: var(--text-dim); cursor: pointer; transition: all .1s;
+    }
+    .copy-btn:hover { color: var(--text); background: var(--bg-hover); }
+    .copy-btn.copied { color: var(--green-bright); }
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    .hint { font-size: 12px; color: var(--text-dim); padding: 8px 12px; background: rgba(59,130,246,.08); border-radius: 4px; margin-bottom: 12px; border: 1px solid rgba(59,130,246,.15); }
+    .id-chip { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 11px; padding: 2px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+    .id-chip:hover { border-color: var(--green-bright); }
+  </style>
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">ZhiYi <span>API Test</span></div>
+  </div>
+  <div class="header-right">
+    <div id="statusBadge" class="status-badge offline">
+      <span class="status-dot"></span>
+      <span id="statusText">Connecting...</span>
+    </div>
+    <div id="tokenDisplay" class="token-display" style="display:none;">No token</div>
+    <button class="btn btn-primary" id="loginBtn" onclick="autoLogin()">Auto Login</button>
+    <a href="/api/docs" target="_blank" class="btn btn-secondary" style="text-decoration:none;">Swagger</a>
+  </div>
+</div>
+
+<!-- ===== Main Layout ===== -->
+<div class="main">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">System</div>
+      <div class="sidebar-item active" onclick="showModule('system')">Health<span class="count">1</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Auth & User</div>
+      <div class="sidebar-item" onclick="showModule('auth')">Auth<span class="count">2</span></div>
+      <div class="sidebar-item" onclick="showModule('user')">User<span class="count">3</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Family</div>
+      <div class="sidebar-item" onclick="showModule('family')">Family<span class="count">4</span></div>
+      <div class="sidebar-item" onclick="showModule('member')">Members<span class="count">4</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Health</div>
+      <div class="sidebar-item" onclick="showModule('record')">Records<span class="count">5</span></div>
+      <div class="sidebar-item" onclick="showModule('assessment')">Assessment<span class="count">5</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">AI</div>
+      <div class="sidebar-item" onclick="showModule('consultation')">AI Chat<span class="count">5</span></div>
+      <div class="sidebar-item" onclick="showModule('redline')">Red Line<span class="count">1</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Core Features</div>
+      <div class="sidebar-item" onclick="showModule('medication')">Medication<span class="count">8</span></div>
+      <div class="sidebar-item" onclick="showModule('metric')">Metrics<span class="count">6</span></div>
+      <div class="sidebar-item" onclick="showModule('notification')">Notifications<span class="count">5</span></div>
+      <div class="sidebar-item" onclick="showModule('knowledge')">Knowledge<span class="count">3</span></div>
+      <div class="sidebar-item" onclick="showModule('report')">Reports<span class="count">3</span></div>
+      <div class="sidebar-item" onclick="showModule('upload')">Upload<span class="count">2</span></div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="content">
+    <!-- Dynamically rendered -->
+  </div>
+</div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const API_BASE = '/v1';
+let token = null;
+let userData = null;
+let families = [];
+let members = [];
+let currentModule = 'system';
+
+// ============================================================
+// API Helper
+// ============================================================
+async function apiCall(method, path, body) {
+  const url = path.startsWith('http') ? path : API_BASE + path;
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body) opts.body = JSON.stringify(body);
+
+  const start = Date.now();
+  try {
+    const res = await fetch(url, opts);
+    const elapsed = Date.now() - start;
+    const data = await res.json().catch(() => ({ raw: 'Non-JSON response' }));
+    return { status: res.status, ok: res.ok, data, elapsed };
+  } catch (e) {
+    return { status: 0, ok: false, data: { error: e.message }, elapsed: Date.now() - start };
+  }
+}
+
+// ============================================================
+// Auto Login
+// ============================================================
+async function autoLogin() {
+  const btn = document.getElementById('loginBtn');
+  btn.textContent = 'Logging in...';
+  btn.disabled = true;
+
+  const res = await apiCall('POST', '/auth/wechat-login', { code: 'test123' });
+
+  if (res.ok && res.data.accessToken) {
+    token = res.data.accessToken;
+    userData = res.data.user;
+    updateStatus(true);
+    btn.textContent = 'Logged In';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-secondary');
+
+    // Auto-fetch families
+    await fetchFamilies();
+    renderModule(currentModule);
+  } else {
+    updateStatus(false);
+    btn.textContent = 'Retry Login';
+    btn.disabled = false;
+    console.error('Login failed:', res.data);
+  }
+}
+
+function updateStatus(online) {
+  const badge = document.getElementById('statusBadge');
+  const text = document.getElementById('statusText');
+  const tokenDisp = document.getElementById('tokenDisplay');
+  if (online && token) {
+    badge.className = 'status-badge online';
+    text.textContent = 'Online';
+    tokenDisp.style.display = 'block';
+    tokenDisp.textContent = 'Token: ' + token.substring(0, 12) + '...' + token.substring(token.length - 4);
+    tokenDisp.title = token;
+  } else {
+    badge.className = 'status-badge offline';
+    text.textContent = 'Offline';
+  }
+}
+
+// ============================================================
+// Fetch families & members
+// ============================================================
+async function fetchFamilies() {
+  const res = await apiCall('GET', '/users/me/families');
+  if (res.ok && res.data.data) {
+    families = res.data.data;
+  }
+  // Also fetch full family list
+  const res2 = await apiCall('GET', '/families');
+  if (res2.ok && res2.data.data) {
+    families = res2.data.data;
+    // Fetch members for first family
+    if (families.length > 0) {
+      const res3 = await apiCall('GET', `/families/${families[0].id}/members`);
+      if (res3.ok && res3.data.data) {
+        members = res3.data.data;
+      }
+    }
+  }
+}
+
+// ============================================================
+// JSON Syntax Highlighting
+// ============================================================
+function syntaxHighlight(obj) {
+  let json = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+  json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return json.replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|\b\d+\.?\d*\b)/g, (match) => {
+    let cls = 'json-number';
+    if (/^"/.test(match)) cls = /:$/.test(match) ? 'json-key' : 'json-string';
+    else if (/true|false/.test(match)) cls = 'json-bool';
+    else if (/null/.test(match)) cls = 'json-null';
+    return `<span class="${cls}">${match}</span>`;
+  });
+}
+
+// ============================================================
+// Render response
+// ============================================================
+function renderResponse(elId, res) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const statusCls = res.ok ? 'ok' : 'err';
+  const statusText = res.status === 0 ? 'Network Error' : `${res.status} ${res.ok ? 'OK' : 'Error'}`;
+  el.innerHTML = `
+    <div class="response-meta">
+      <span class="${statusCls}">${statusText}</span>
+      <span>${res.elapsed}ms</span>
+    </div>
+    <pre>${syntaxHighlight(res.data)}</pre>
+  `;
+  el.style.display = 'block';
+}
+
+// ============================================================
+// Copy helper
+// ============================================================
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      btn.classList.add('copied');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy'; }, 1500);
+    }
+  });
+}
+
+// ============================================================
+// ID Chip (clickable to copy)
+// ============================================================
+function idChip(label, value) {
+  if (!value) return `<span class="id-chip">${label}: <em style="color:var(--text-dim)">none</em></span>`;
+  return `<span class="id-chip" onclick="copyText('${value}', this)" title="Click to copy">${label}: ${value.substring(0,8)}...
+    <button class="copy-btn" onclick="event.stopPropagation();copyText('${value}',this)">Copy</button>
+  </span>`;
+}
+
+// ============================================================
+// Endpoint card builder
+// ============================================================
+let cardCounter = 0;
+function endpointCard(method, path, desc, fields, action) {
+  const id = `ep_${++cardCounter}`;
+  const fieldsHtml = fields.map(f => {
+    if (f.type === 'textarea') {
+      return `<div class="field-row"><div class="field-label">${f.label}</div><textarea class="field-input" id="${id}_${f.name}" placeholder="${f.placeholder || ''}">${f.value || ''}</textarea></div>`;
+    }
+    if (f.type === 'select') {
+      const opts = f.options.map(o => `<option value="${o.value}" ${o.value === f.value ? 'selected' : ''}>${o.label}</option>`).join('');
+      return `<div class="field-row"><div class="field-label">${f.label}</div><select class="field-input" id="${id}_${f.name}">${opts}</select></div>`;
+    }
+    return `<div class="field-row"><div class="field-label">${f.label}</div><input class="field-input" id="${id}_${f.name}" placeholder="${f.placeholder || ''}" value="${f.value || ''}"></div>`;
+  }).join('');
+
+  return `
+    <div class="endpoint-card" id="${id}">
+      <div class="endpoint-header" onclick="toggleCard('${id}')">
+        <span class="method-badge method-${method}">${method}</span>
+        <span class="endpoint-path">${path}</span>
+        <span class="endpoint-desc">${desc}</span>
+      </div>
+      <div class="endpoint-body">
+        ${fieldsHtml}
+        <div class="endpoint-actions">
+          <button class="btn btn-primary" onclick="${action}('${id}')">Send</button>
+        </div>
+        <div class="response-box" id="${id}_resp" style="display:none;"></div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleCard(id) {
+  document.getElementById(id).classList.toggle('expanded');
+}
+
+function getFieldVal(id, name) {
+  const el = document.getElementById(`${id}_${name}`);
+  return el ? el.value : '';
+}
+
+// ============================================================
+// Upload helper (multipart/form-data)
+// ============================================================
+function buildUploadCard(key, path, desc) {
+  const id = `up_${key}`;
+  return `
+    <div class="endpoint-card" id="${id}">
+      <div class="endpoint-header" onclick="toggleCard('${id}')">
+        <span class="method-badge method-POST">POST</span>
+        <span class="endpoint-path">${path}</span>
+        <span class="endpoint-desc">${desc}</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="field-row">
+          <div class="field-label">Select file (field name = "file")</div>
+          <input type="file" class="field-input" id="${id}_file" style="padding:6px;">
+        </div>
+        <div class="endpoint-actions">
+          <button class="btn btn-primary" onclick="uploadFile('${path}', '${id}_file', '${id}_resp')">Upload</button>
+        </div>
+        <div class="response-box" id="${id}_resp" style="display:none;"></div>
+      </div>
+    </div>`;
+}
+
+async function uploadFile(path, inputId, respId) {
+  const input = document.getElementById(inputId);
+  const file = input.files && input.files[0];
+  if (!file) { alert('Please select a file first'); return; }
+  const form = new FormData();
+  form.append('file', file);
+  const start = Date.now();
+  try {
+    const res = await fetch(API_BASE + path, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: form,
+    });
+    const elapsed = Date.now() - start;
+    const data = await res.json().catch(() => ({ raw: 'Non-JSON response' }));
+    renderResponse(respId, { status: res.status, ok: res.ok, data, elapsed });
+  } catch (e) {
+    renderResponse(respId, { status: 0, ok: false, data: { error: e.message }, elapsed: Date.now() - start });
+  }
+}
+
+// ============================================================
+// Module definitions
+// ============================================================
+function renderModule(mod) {
+  currentModule = mod;
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  // Find and activate the clicked sidebar item
+  const sidebarItems = document.querySelectorAll('.sidebar-item');
+  sidebarItems.forEach(el => {
+    if (el.getAttribute('onclick') === `showModule('${mod}')`) el.classList.add('active');
+  });
+
+  const c = document.getElementById('content');
+  const fid = families[0]?.id || '';
+  const mid = members[0]?.id || '';
+
+  let html = '';
+
+  switch (mod) {
+    case 'system':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(61,138,90,.2)">H</div> System Health</div>`;
+      html += endpointCard('GET', '/health', 'Health check', [], async (id) => {
+        const res = await apiCall('GET', '/health');
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'auth':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(59,130,246,.2)">A</div> Authentication</div>`;
+      html += `<div class="hint">Wechat login uses a dev placeholder: any code creates/returns a user. Token auto-applied to all subsequent requests.</div>`;
+      html += endpointCard('POST', '/auth/wechat-login', 'Wechat login (dev mode)', [
+        { name: 'code', label: 'Login Code', value: 'test123', placeholder: 'Any string works in dev mode' }
+      ], async (id) => {
+        const code = getFieldVal(id, 'code');
+        const res = await apiCall('POST', '/auth/wechat-login', { code });
+        if (res.ok && res.data.data.accessToken) {
+          token = res.data.data.accessToken;
+          userData = res.data.data.user;
+          updateStatus(true);
+          await fetchFamilies();
+        }
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/auth/refresh-token', 'Refresh token', [
+        { name: 'userId', label: 'User ID', value: userData?.id || '', placeholder: 'User UUID' }
+      ], async (id) => {
+        const userId = getFieldVal(id, 'userId');
+        const res = await apiCall('POST', '/auth/refresh-token', { userId });
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'user':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(139,92,246,.2)">U</div> User Profile</div>`;
+      html += endpointCard('GET', '/users/me', 'Get current user', [], async (id) => {
+        const res = await apiCall('GET', '/users/me');
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/users/me', 'Update profile', [
+        { name: 'body', label: 'Update body (JSON)', type: 'textarea', value: '{\n  "nickname": "Test User",\n  "avatarUrl": "https://example.com/avatar.png"\n}' }
+      ], async (id) => {
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('PATCH', '/users/me', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/users/me/families', 'My families', [], async (id) => {
+        const res = await apiCall('GET', '/users/me/families');
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'family':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(6,182,212,.2)">F</div> Family Management</div>`;
+      if (families.length > 0) {
+        html += `<div class="hint">Loaded family: <strong>${families[0].name || 'Unnamed'}</strong> ${idChip('familyId', fid)}</div>`;
+      }
+      html += endpointCard('POST', '/families', 'Create family', [
+        { name: 'name', label: 'Family Name', value: 'Test Family', placeholder: 'Family name' },
+        { name: 'notes', label: 'Notes', value: 'Created from test dashboard' }
+      ], async (id) => {
+        const body = { name: getFieldVal(id, 'name'), notes: getFieldVal(id, 'notes') };
+        const res = await apiCall('POST', '/families', body);
+        if (res.ok) await fetchFamilies();
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/families', 'List families', [], async (id) => {
+        const res = await apiCall('GET', '/families');
+        if (res.ok && res.data.data) { families = res.data.data; }
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', `/families/:familyId`, 'Family detail', [
+        { name: 'familyId', label: 'Family ID', value: fid, placeholder: 'Family UUID' }
+      ], async (id) => {
+        const fId = getFieldVal(id, 'familyId');
+        const res = await apiCall('GET', `/families/${fId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', `/families/:familyId`, 'Update family', [
+        { name: 'familyId', label: 'Family ID', value: fid },
+        { name: 'body', label: 'Update body (JSON)', type: 'textarea', value: '{\n  "name": "Updated Family Name"\n}' }
+      ], async (id) => {
+        const fId = getFieldVal(id, 'familyId');
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('PATCH', `/families/${fId}`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'member':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(245,158,11,.2)">M</div> Family Members</div>`;
+      if (members.length > 0) {
+        html += `<div class="hint">Loaded member: <strong>${members[0].nickname || 'Unknown'}</strong> ${idChip('memberId', mid)}</div>`;
+      } else if (families.length > 0) {
+        html += `<div class="hint">No members found. Use "Add Member" below to create one.</div>`;
+      } else {
+        html += `<div class="hint">No family found. Create a family first in the Family tab.</div>`;
+      }
+      html += endpointCard('GET', '/families/:familyId/members', 'List members', [
+        { name: 'familyId', label: 'Family ID', value: fid }
+      ], async (id) => {
+        const fId = getFieldVal(id, 'familyId');
+        const res = await apiCall('GET', `/families/${fId}/members`);
+        if (res.ok && res.data.data) { members = res.data.data; }
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/families/:familyId/members', 'Add member', [
+        { name: 'familyId', label: 'Family ID', value: fid },
+        { name: 'nickname', label: 'Nickname', value: 'Test Member' },
+        { name: 'relation', label: 'Relation', type: 'select', options: [
+          { value: 'self', label: 'self' }, { value: 'spouse', label: 'spouse' },
+          { value: 'child', label: 'child' }, { value: 'parent', label: 'parent' },
+          { value: 'grandparent', label: 'grandparent' }, { value: 'other', label: 'other' }
+        ], value: 'self' },
+        { name: 'age', label: 'Age', value: '30', placeholder: '0-150' },
+        { name: 'gender', label: 'Gender (0=unknown,1=male,2=female)', type: 'select', options: [
+          { value: '0', label: 'Unknown' }, { value: '1', label: 'Male' }, { value: '2', label: 'Female' }
+        ], value: '1' }
+      ], async (id) => {
+        const fId = getFieldVal(id, 'familyId');
+        const body = {
+          nickname: getFieldVal(id, 'nickname'),
+          relation: getFieldVal(id, 'relation'),
+          age: parseInt(getFieldVal(id, 'age')) || undefined,
+          gender: parseInt(getFieldVal(id, 'gender')),
+        };
+        const res = await apiCall('POST', `/families/${fId}/members`, body);
+        if (res.ok) await fetchFamilies();
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/families/:familyId/members/:memberId', 'Member detail', [
+        { name: 'familyId', label: 'Family ID', value: fid },
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const fId = getFieldVal(id, 'familyId');
+        const mId = getFieldVal(id, 'memberId');
+        const res = await apiCall('GET', `/families/${fId}/members/${mId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/families/:familyId/members/:memberId', 'Update member', [
+        { name: 'familyId', label: 'Family ID', value: fid },
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'body', label: 'Update body (JSON)', type: 'textarea', value: '{\n  "nickname": "Updated Name",\n  "age": 31\n}' }
+      ], async (id) => {
+        const fId = getFieldVal(id, 'familyId');
+        const mId = getFieldVal(id, 'memberId');
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('PATCH', `/families/${fId}/members/${mId}`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'record':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(61,138,90,.2)">R</div> Health Records</div>`;
+      html += endpointCard('GET', '/health-records/:memberId', 'Get health record', [
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const res = await apiCall('GET', `/health-records/${mId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/health-records/:memberId', 'Update basic info', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'body', label: 'Update body (JSON)', type: 'textarea', value: '{\n  "bloodType": "A",\n  "height": 170,\n  "weight": 65\n}' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('PATCH', `/health-records/${mId}`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/health-records/:memberId/chronic-diseases', 'Update chronic diseases', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'body', label: 'Diseases (JSON array)', type: 'textarea', value: '[\n  { "name": "Hypertension", "diagnosedAt": "2023-01-01" }\n]' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const body = { chronicDiseases: JSON.parse(getFieldVal(id, 'body')) };
+        const res = await apiCall('PATCH', `/health-records/${mId}/chronic-diseases`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/health-records/:memberId/allergies', 'Update allergies', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'body', label: 'Allergies (JSON array)', type: 'textarea', value: '[\n  { "name": "Penicillin", "severity": "severe" }\n]' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const body = { allergies: JSON.parse(getFieldVal(id, 'body')) };
+        const res = await apiCall('PATCH', `/health-records/${mId}/allergies`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/health-records/:memberId/export', 'Export health record', [
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const res = await apiCall('GET', `/health-records/${mId}/export`);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'assessment':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(139,92,246,.2)">A</div> Health Assessment</div>`;
+      html += endpointCard('POST', '/assessments/start', 'Start assessment', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'type', label: 'Type', type: 'select', options: [
+          { value: 'initial', label: 'initial' }, { value: 'review', label: 'review' }, { value: 'manual', label: 'manual' }
+        ], value: 'initial' }
+      ], async (id) => {
+        const body = { memberId: getFieldVal(id, 'memberId'), type: getFieldVal(id, 'type') };
+        const res = await apiCall('POST', '/assessments/start', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/assessments/answer', 'Submit answer', [
+        { name: 'sessionId', label: 'Session ID', value: '', placeholder: 'From start response' },
+        { name: 'step', label: 'Step number', value: '1' },
+        { name: 'answers', label: 'Answers (JSON)', type: 'textarea', value: '"Yes"' }
+      ], async (id) => {
+        const body = {
+          sessionId: getFieldVal(id, 'sessionId'),
+          step: parseInt(getFieldVal(id, 'step')),
+          answers: JSON.parse(getFieldVal(id, 'answers')),
+        };
+        const res = await apiCall('POST', '/assessments/answer', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/assessments/:id/result', 'Get result', [
+        { name: 'id', label: 'Assessment ID', value: '', placeholder: 'Assessment UUID' }
+      ], async (id) => {
+        const aId = getFieldVal(id, 'id');
+        const res = await apiCall('GET', `/assessments/${aId}/result`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/assessments/history?memberId=', 'Assessment history', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'page', label: 'Page', value: '1' },
+        { name: 'pageSize', label: 'Page Size', value: '10' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const page = getFieldVal(id, 'page');
+        const ps = getFieldVal(id, 'pageSize');
+        const res = await apiCall('GET', `/assessments/history?memberId=${mId}&page=${page}&pageSize=${ps}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/assessments/manual-review', 'Manual review', [
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const body = { memberId: getFieldVal(id, 'memberId') };
+        const res = await apiCall('POST', '/assessments/manual-review', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'consultation':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(6,182,212,.2)">AI</div> AI Consultation (SSE)</div>`;
+      html += `<div class="hint">SSE streaming: AI response streams token by token. Red-line engine checks locally first (<5ms).</div>`;
+      html += `<div class="endpoint-actions" style="margin:10px 0 0;">
+        <button class="btn" onclick="checkAiStatus()">Check AI Model Status</button>
+        <span id="ai_status_out" style="font-size:12px;color:var(--text-dim);margin-left:8px;"></span>
+      </div>`;
+      html += `<div class="sse-container">
+        <div class="field-row">
+          <div class="field-label">Family ID</div>
+          <input class="field-input" id="sse_familyId" value="${fid}" placeholder="Family ID">
+        </div>
+        <div class="field-row">
+          <div class="field-label">Member ID</div>
+          <input class="field-input" id="sse_memberId" value="${mid}" placeholder="Member ID">
+        </div>
+        <div class="field-row">
+          <div class="field-label">Question</div>
+          <textarea class="field-input" id="sse_query" placeholder="Ask a health question..." style="min-height:80px;">I have a mild headache and feel a bit tired lately. What could be the cause?</textarea>
+        </div>
+        <div class="endpoint-actions" style="margin-top:8px;">
+          <button class="btn btn-primary" onclick="startSSE()">Start AI Consultation</button>
+          <span id="sse_status" style="font-size:12px;color:var(--text-dim);"></span>
+        </div>
+        <div style="margin-top:12px;">
+          <div class="field-label">AI Response (streaming):</div>
+          <div class="sse-output" id="sse_output">Waiting to start...</div>
+          <div class="sse-event" id="sse_events"></div>
+        </div>
+      </div>`;
+      html += endpointCard('GET', '/consultations/history?memberId=', 'Consultation history', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'page', label: 'Page', value: '1' },
+        { name: 'pageSize', label: 'Page Size', value: '20' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const page = getFieldVal(id, 'page');
+        const ps = getFieldVal(id, 'pageSize');
+        const res = await apiCall('GET', `/consultations/history?memberId=${mId}&page=${page}&pageSize=${ps}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/consultations/:id', 'Consultation detail', [
+        { name: 'id', label: 'Consultation ID', value: '', placeholder: 'Consultation UUID' }
+      ], async (id) => {
+        const cId = getFieldVal(id, 'id');
+        const res = await apiCall('GET', `/consultations/${cId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/consultations/:id/feedback', 'Submit feedback', [
+        { name: 'id', label: 'Consultation ID', value: '', placeholder: 'Consultation UUID' },
+        { name: 'satisfaction', label: 'Satisfaction (1-5)', value: '5' },
+        { name: 'feedbackText', label: 'Feedback text', type: 'textarea', value: 'Very helpful, thanks!' }
+      ], async (id) => {
+        const cId = getFieldVal(id, 'id');
+        const body = {
+          satisfaction: parseInt(getFieldVal(id, 'satisfaction')),
+          feedbackText: getFieldVal(id, 'feedbackText'),
+        };
+        const res = await apiCall('POST', `/consultations/${cId}/feedback`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'redline':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(239,68,68,.2)">R</div> Red Line Engine</div>`;
+      html += `<div class="hint">Tests the local medical red-line detection engine. Runs in <5ms, no AI call needed.</div>`;
+      html += endpointCard('POST', '/consultations/redline-check', 'Red line check', [
+        { name: 'query', label: 'Query to check', type: 'textarea', value: 'I have severe chest pain and difficulty breathing' },
+        { name: 'memberId', label: 'Member ID (optional)', value: mid }
+      ], async (id) => {
+        const body = {
+          query: getFieldVal(id, 'query'),
+          memberId: getFieldVal(id, 'memberId') || undefined,
+        };
+        const res = await apiCall('POST', '/consultations/redline-check', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'medication':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(61,138,90,.2)">M</div> Medication Management</div>`;
+      if (members.length > 0) {
+        html += `<div class="hint">Active member context: <strong>${members[0].nickname || 'Unknown'}</strong> ${idChip('memberId', mid)}</div>`;
+      }
+      html += endpointCard('GET', '/medications?memberId=', 'List medication plans', [
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const res = await apiCall('GET', `/medications?memberId=${encodeURIComponent(mId)}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/medications', 'Create medication plan', [
+        { name: 'body', label: 'Create body (JSON)', type: 'textarea', value: `{
+  "memberId": "${mid}",
+  "medicineName": "缬沙坦",
+  "dosage": "80mg",
+  "dosageUnit": "片",
+  "frequency": "daily",
+  "startDate": "2026-07-09"
+}` }
+      ], async (id) => {
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('POST', '/medications', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/medications/today?memberId=', 'Today reminders', [
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const res = await apiCall('GET', `/medications/today?memberId=${encodeURIComponent(mId)}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/medications/:id', 'Get plan detail', [
+        { name: 'id', label: 'Plan ID', value: '', placeholder: 'Medication UUID' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'id');
+        const res = await apiCall('GET', `/medications/${mId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/medications/:id', 'Update plan', [
+        { name: 'id', label: 'Plan ID', value: '' },
+        { name: 'body', label: 'Update body (JSON)', type: 'textarea', value: '{\n  "dosage": "160mg",\n  "notes": "剂量已调整"\n}' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'id');
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('PATCH', `/medications/${mId}`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('DELETE', '/medications/:id', 'Deactivate plan (soft delete)', [
+        { name: 'id', label: 'Plan ID', value: '' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'id');
+        const res = await apiCall('DELETE', `/medications/${mId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/medications/:id/adherence', 'Mark adherence (taken/missed/skipped)', [
+        { name: 'id', label: 'Plan ID', value: '' },
+        { name: 'body', label: 'Body (JSON)', type: 'textarea', value: '{\n  "status": "taken",\n  "scheduledAt": "2026-07-09T08:00:00.000Z"\n}' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'id');
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('POST', `/medications/${mId}/adherence`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/medications/:id/adherences', 'Get adherence records', [
+        { name: 'id', label: 'Plan ID', value: '' },
+        { name: 'from', label: 'From (ISO, optional)', value: '' },
+        { name: 'to', label: 'To (ISO, optional)', value: '' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'id');
+        const from = getFieldVal(id, 'from');
+        const to = getFieldVal(id, 'to');
+        let q = `/medications/${mId}/adherences`;
+        const params = [];
+        if (from) params.push(`from=${encodeURIComponent(from)}`);
+        if (to) params.push(`to=${encodeURIComponent(to)}`);
+        if (params.length) q += '?' + params.join('&');
+        const res = await apiCall('GET', q);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'metric':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(6,182,212,.2)">M</div> Health Metrics</div>`;
+      if (members.length > 0) {
+        html += `<div class="hint">Active member context: <strong>${members[0].nickname || 'Unknown'}</strong> ${idChip('memberId', mid)}</div>`;
+      }
+      html += endpointCard('GET', '/metrics?memberId=', 'List metric records', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'type', label: 'Type (optional)', value: 'blood_pressure_systolic' },
+        { name: 'limit', label: 'Limit (optional)', value: '50' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const type = getFieldVal(id, 'type');
+        const limit = getFieldVal(id, 'limit');
+        let q = `/metrics?memberId=${encodeURIComponent(mId)}`;
+        if (type) q += `&type=${encodeURIComponent(type)}`;
+        if (limit) q += `&limit=${encodeURIComponent(limit)}`;
+        const res = await apiCall('GET', q);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/metrics', 'Record single metric', [
+        { name: 'body', label: 'Body (JSON)', type: 'textarea', value: `{
+  "memberId": "${mid}",
+  "metricType": "blood_pressure_systolic",
+  "value": 128,
+  "unit": "mmHg"
+}` }
+      ], async (id) => {
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('POST', '/metrics', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/metrics/batch', 'Batch record (e.g. blood pressure)', [
+        { name: 'body', label: 'Body (JSON)', type: 'textarea', value: `{
+  "memberId": "${mid}",
+  "metrics": [
+    { "metricType": "blood_pressure_systolic", "value": 128, "unit": "mmHg" },
+    { "metricType": "blood_pressure_diastolic", "value": 82, "unit": "mmHg" }
+  ]
+}` }
+      ], async (id) => {
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('POST', '/metrics/batch', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/metrics/trend?memberId=&type=&days=', 'Metric trend + threshold eval', [
+        { name: 'memberId', label: 'Member ID', value: mid },
+        { name: 'type', label: 'Metric Type', value: 'blood_pressure_systolic' },
+        { name: 'days', label: 'Days', value: '30' }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const type = getFieldVal(id, 'type');
+        const days = getFieldVal(id, 'days');
+        const res = await apiCall('GET', `/metrics/trend?memberId=${encodeURIComponent(mId)}&type=${encodeURIComponent(type)}&days=${encodeURIComponent(days)}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/metrics/thresholds', 'Get thresholds', [], async (id) => {
+        const res = await apiCall('GET', '/metrics/thresholds');
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('PATCH', '/metrics/thresholds/:metricType', 'Update threshold', [
+        { name: 'metricType', label: 'Metric Type', value: 'blood_pressure_systolic' },
+        { name: 'body', label: 'Body (JSON)', type: 'textarea', value: '{\n  "minNormal": 90,\n  "maxNormal": 139,\n  "alertConsecutiveCount": 3\n}' }
+      ], async (id) => {
+        const type = getFieldVal(id, 'metricType');
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('PATCH', `/metrics/thresholds/${type}`, body);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'notification':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(245,158,11,.2)">N</div> Notifications</div>`;
+      html += endpointCard('GET', '/notifications', 'List notifications', [
+        { name: 'page', label: 'Page', value: '1' },
+        { name: 'pageSize', label: 'Page Size', value: '20' }
+      ], async (id) => {
+        const page = getFieldVal(id, 'page');
+        const ps = getFieldVal(id, 'pageSize');
+        const res = await apiCall('GET', `/notifications?page=${page}&pageSize=${ps}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/notifications/unread-count', 'Unread count', [], async (id) => {
+        const res = await apiCall('GET', '/notifications/unread-count');
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/notifications/:id/read', 'Mark one read', [
+        { name: 'id', label: 'Notification ID', value: '' }
+      ], async (id) => {
+        const nId = getFieldVal(id, 'id');
+        const res = await apiCall('POST', `/notifications/${nId}/read`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/notifications/read-all', 'Mark all read', [], async (id) => {
+        const res = await apiCall('POST', '/notifications/read-all');
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('DELETE', '/notifications/:id', 'Delete notification', [
+        { name: 'id', label: 'Notification ID', value: '' }
+      ], async (id) => {
+        const nId = getFieldVal(id, 'id');
+        const res = await apiCall('DELETE', `/notifications/${nId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'knowledge':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(139,92,246,.2)">K</div> Health Knowledge</div>`;
+      html += `<div class="hint">Knowledge service returns built-in default articles when DB is empty, so it works even before seeding.</div>`;
+      html += endpointCard('GET', '/knowledge', 'List knowledge', [
+        { name: 'category', label: 'Category (optional)', value: '' },
+        { name: 'keyword', label: 'Keyword (optional)', value: '' },
+        { name: 'page', label: 'Page', value: '1' },
+        { name: 'pageSize', label: 'Page Size', value: '10' }
+      ], async (id) => {
+        const category = getFieldVal(id, 'category');
+        const keyword = getFieldVal(id, 'keyword');
+        const page = getFieldVal(id, 'page');
+        const ps = getFieldVal(id, 'pageSize');
+        let q = `/knowledge?page=${page}&pageSize=${ps}`;
+        if (category) q += `&category=${encodeURIComponent(category)}`;
+        if (keyword) q += `&keyword=${encodeURIComponent(keyword)}`;
+        const res = await apiCall('GET', q);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/knowledge/categories', 'Get categories', [], async (id) => {
+        const res = await apiCall('GET', '/knowledge/categories');
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/knowledge/:id', 'Get article detail (increments read count)', [
+        { name: 'id', label: 'Article ID', value: '' }
+      ], async (id) => {
+        const aId = getFieldVal(id, 'id');
+        const res = await apiCall('GET', `/knowledge/${aId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'report':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(61,138,90,.2)">R</div> Health Reports</div>`;
+      if (members.length > 0) {
+        html += `<div class="hint">Active member context: <strong>${members[0].nickname || 'Unknown'}</strong> ${idChip('memberId', mid)}</div>`;
+      }
+      html += endpointCard('GET', '/reports?memberId=', 'List reports', [
+        { name: 'memberId', label: 'Member ID', value: mid }
+      ], async (id) => {
+        const mId = getFieldVal(id, 'memberId');
+        const res = await apiCall('GET', `/reports?memberId=${encodeURIComponent(mId)}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('POST', '/reports/generate', 'Generate report (aggregates record/assessment/metrics/medication)', [
+        { name: 'body', label: 'Body (JSON)', type: 'textarea', value: `{
+  "memberId": "${mid}",
+  "type": "periodic",
+  "title": "七月健康月报",
+  "periodStart": "2026-06-09",
+  "periodEnd": "2026-07-09"
+}` }
+      ], async (id) => {
+        const body = JSON.parse(getFieldVal(id, 'body'));
+        const res = await apiCall('POST', '/reports/generate', body);
+        renderResponse(`${id}_resp`, res);
+      });
+      html += endpointCard('GET', '/reports/:id', 'Get report detail', [
+        { name: 'id', label: 'Report ID', value: '' }
+      ], async (id) => {
+        const rId = getFieldVal(id, 'id');
+        const res = await apiCall('GET', `/reports/${rId}`);
+        renderResponse(`${id}_resp`, res);
+      });
+      break;
+
+    case 'upload':
+      html = `<div class="module-title"><div class="icon" style="background:rgba(59,130,246,.2)">U</div> File Upload</div>`;
+      html += `<div class="hint">Upload uses multipart/form-data (field name = "file"). Avatar limited to images ≤5MB; general upload ≤10MB. Response returns a static URL served from <code>/uploads/...</code>.</div>`;
+      html += buildUploadCard('avatar', '/upload/avatar', 'Upload avatar / image (≤5MB, image/*)');
+      html += buildUploadCard('file', '/upload', 'Upload general file (≤10MB)');
+      break;
+
+    default:
+      html = '<p>Select a module from the sidebar.</p>';
+  }
+
+  c.innerHTML = html;
+}
+
+// ============================================================
+// SSE Consultation
+// ============================================================
+async function startSSE() {
+  const familyId = document.getElementById('sse_familyId').value;
+  const memberId = document.getElementById('sse_memberId').value;
+  const query = document.getElementById('sse_query').value;
+
+  if (!familyId || !memberId || !query) {
+    alert('Please fill in Family ID, Member ID, and Question');
+    return;
+  }
+
+  const output = document.getElementById('sse_output');
+  const events = document.getElementById('sse_events');
+  const status = document.getElementById('sse_status');
+  output.textContent = '';
+  events.innerHTML = '';
+  status.textContent = 'Connecting...';
+
+  const body = { query, familyId, memberId, inputType: 'text' };
+
+  try {
+    const response = await fetch('/v1/consultations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      output.textContent = `Error ${response.status}: ${JSON.stringify(errData)}`;
+      status.textContent = 'Failed';
+      return;
+    }
+
+    status.textContent = 'Streaming...';
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      let currentEvent = null;
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.substring(7).trim();
+        } else if (line.startsWith('data: ') && currentEvent) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            handleSSEEvent(currentEvent, data, output, events);
+          } catch (e) {
+            // Ignore parse errors
+          }
+          currentEvent = null;
+        }
+      }
+    }
+
+    status.textContent = 'Done';
+  } catch (e) {
+    output.textContent = 'Connection error: ' + e.message;
+    status.textContent = 'Error';
+  }
+}
+
+async function checkAiStatus() {
+  const out = document.getElementById('ai_status_out');
+  if (!out) return;
+  out.textContent = 'checking...';
+  try {
+    const res = await apiCall('GET', '/ai/status');
+    const p = (res.data && res.data.data) || res.data || {};
+    const color = p.available ? '#16a34a' : '#e5484d';
+    out.innerHTML = `provider=<b>${p.provider || '-'}</b> &nbsp; model=<b>${p.model || '-'}</b> &nbsp; available=<b style="color:${color}">${p.available}</b>` +
+      (p.note ? ` &nbsp; <span style="color:var(--text-dim)">(${p.note})</span>` : '');
+  } catch (e) {
+    out.textContent = 'error: ' + e.message;
+  }
+}
+
+function handleSSEEvent(event, data, outputEl, eventsEl) {
+  switch (event) {
+    case 'red_line':
+      eventsEl.innerHTML += `<div class="sse-event-item"><span class="event-name">[red_line]</span> Category: <strong style="color:var(--red)">${data.category}</strong> | Severity: ${data.severity}</div>`;
+      break;
+    case 'disclaimer':
+      eventsEl.innerHTML += `<div class="sse-event-item"><span class="event-name">[disclaimer]</span> ${data.text}</div>`;
+      break;
+    case 'chunk':
+      outputEl.textContent += data.text;
+      outputEl.scrollTop = outputEl.scrollHeight;
+      break;
+    case 'done':
+      eventsEl.innerHTML += `<div class="sse-event-item"><span class="event-name">[done]</span> Model: ${data.model} | Time: ${data.responseTimeMs}ms | Session: ${data.sessionId?.substring(0,8)}...</div>`;
+      break;
+    default:
+      eventsEl.innerHTML += `<div class="sse-event-item"><span class="event-name">[${event}]</span> ${JSON.stringify(data).substring(0, 100)}</div>`;
+  }
+}
+
+// ============================================================
+// Init
+// ============================================================
+function showModule(mod) {
+  renderModule(mod);
+}
+
+// Check API health on load
+(async function init() {
+  renderModule('system');
+  try {
+    const res = await fetch('/health');
+    if (res.ok) {
+      updateStatus(false);
+      document.getElementById('statusText').textContent = 'API Online (not logged in)';
+      document.getElementById('statusBadge').className = 'status-badge offline';
+      // Auto login after a short delay
+      setTimeout(() => autoLogin(), 500);
+    }
+  } catch (e) {
+    document.getElementById('statusText').textContent = 'API Offline';
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testRegex": "test/security-hardening/.*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^\\.prisma/client/default$": "<rootDir>/node_modules/.prisma/client/default.js"
+  },
+  "collectCoverageFrom": [
+    "src/common/guards/admin.guard.ts",
+    "src/modules/{medication,assessment,auth}/**/*.ts"
+  ],
+  "coverageDirectory": "coverage/security",
+  "testEnvironment": "node",
+  "clearMocks": true
+}
